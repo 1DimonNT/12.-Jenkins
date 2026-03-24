@@ -1,3 +1,4 @@
+import os
 import allure
 import pytest
 from selenium import webdriver
@@ -10,13 +11,21 @@ from webdriver_manager.chrome import ChromeDriverManager
 def driver():
     """Фикстура для создания и закрытия драйвера"""
     chrome_options = Options()
-    chrome_options.add_argument("--start-maximized")
 
-    # Для Jenkins: раскомментировать при запуске в CI
-    # if 'JENKINS_URL' in os.environ:
-    #     chrome_options.add_argument("--headless")
-    #     chrome_options.add_argument("--no-sandbox")
-    #     chrome_options.add_argument("--disable-dev-shm-usage")
+    # Проверяем, запущены ли тесты в Jenkins
+    if 'JENKINS_URL' in os.environ or 'JENKINS_HOME' in os.environ:
+        # Настройки для Jenkins (headless режим)
+        chrome_options.add_argument("--headless=new")  # headless режим
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-setuid-sandbox")
+        chrome_options.add_argument("--remote-debugging-port=9222")
+    else:
+        # Локальные настройки
+        chrome_options.add_argument("--start-maximized")
 
     # Правильный способ: используем Service
     service = Service(ChromeDriverManager().install())
