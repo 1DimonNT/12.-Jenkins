@@ -1,35 +1,42 @@
 import os
-import allure
 import pytest
+import allure
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 
 
 @pytest.fixture(scope="function")
 def driver():
-    """Фикстура для создания и закрытия драйвера"""
+    """Фикстура для создания и закрытия драйвера через Selenoid"""
     chrome_options = Options()
 
     # Проверяем, запущены ли тесты в Jenkins
-    if 'JENKINS_URL' in os.environ or 'JENKINS_HOME' in os.environ:
+    is_jenkins = 'JENKINS_URL' in os.environ or 'JENKINS_HOME' in os.environ
+
+    if is_jenkins:
         # Настройки для Jenkins (headless режим)
-        chrome_options.add_argument("--headless=new")  # headless режим
+        chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--disable-setuid-sandbox")
-        chrome_options.add_argument("--remote-debugging-port=9222")
-    else:
-        # Локальные настройки
-        chrome_options.add_argument("--start-maximized")
 
-    # Правильный способ: используем Service
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+        # Используем Selenoid (Selenium Grid)
+        # URL Selenoid (обычно доступен внутри Docker сети)
+        selenoid_url = os.environ.get('SELENOID_URL', 'http://selenoid:4444/wd/hub')
+
+        driver = webdriver.Remote(
+            command_executor=selenoid_url,
+            options=chrome_options
+        )
+    else:
+        # Локальный запуск
+        chrome_options.add_argument("--start-maximized")
+        from selenium.webdriver.chrome.service import Service
+        from webdriver_manager.chrome import ChromeDriverManager
+
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
 
     driver.implicitly_wait(10)
 
