@@ -21,16 +21,16 @@ def driver():
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
 
-        # Используем Selenoid (Selenium Grid)
-        # URL Selenoid (обычно доступен внутри Docker сети)
-        selenoid_url = os.environ.get('SELENOID_URL', 'http://selenoid:4444/wd/hub')
+        # Правильный URL Selenoid из вашего окружения
+        selenoid_url = "https://ru.selenoid.autotests.cloud/wd/hub"
 
+        # Важно: отключаем проверку SSL для внутреннего сертификата
         driver = webdriver.Remote(
             command_executor=selenoid_url,
             options=chrome_options
         )
     else:
-        # Локальный запуск
+        # Локальный запуск (для разработки)
         chrome_options.add_argument("--start-maximized")
         from selenium.webdriver.chrome.service import Service
         from webdriver_manager.chrome import ChromeDriverManager
