@@ -1,12 +1,14 @@
 import os
-import pytest
 import allure
+import pytest
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 @pytest.fixture(scope="function")
-def driver():
+def driver(request):
     """Фикстура для создания и закрытия драйвера через Selenoid"""
     chrome_options = Options()
 
@@ -24,7 +26,6 @@ def driver():
         # Правильный URL Selenoid из вашего окружения
         selenoid_url = "https://ru.selenoid.autotests.cloud/wd/hub"
 
-        # Важно: отключаем проверку SSL для внутреннего сертификата
         driver = webdriver.Remote(
             command_executor=selenoid_url,
             options=chrome_options
@@ -32,33 +33,52 @@ def driver():
     else:
         # Локальный запуск (для разработки)
         chrome_options.add_argument("--start-maximized")
-        from selenium.webdriver.chrome.service import Service
-        from webdriver_manager.chrome import ChromeDriverManager
-
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
     driver.implicitly_wait(10)
 
+    # Сохраняем имя теста
+    driver.test_name = request.node.name
+
     yield driver
 
-    # Если тест упал — делаем скриншот для Allure
-    if hasattr(driver, 'test_failed') and driver.test_failed:
-        allure.attach(
-            driver.get_screenshot_as_png(),
-            name="screenshot",
-            attachment_type=allure.attachment_type.PNG
-        )
+    # Добавляем скриншот после теста (всегда)
+    allure.attach(
+        driver.get_screenshot_as_png(),
+        name=f"{driver.test_name}_screenshot",
+        attachment_type=allure.attachment_type.PNG
+    )
+
+    # Добавляем URL страницы
+    allure.attach(
+        driver.current_url,
+        name=f"{driver.test_name}_current_url",
+        attachment_type=allure.attachment_type.TEXT
+    )
+
+    # Добавляем заголовок страницы
+    allure.attach(
+        driver.title,
+        name=f"{driver.test_name}_page_title",
+        attachment_type=allure.attachment_type.TEXT
+    )
 
     driver.quit()
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Хук для отслеживания падения теста"""
+    """Хук для добавления скриншота при падении теста"""
     outcome = yield
     rep = outcome.get_result()
+
+    # Если тест упал, добавляем скриншот
     if rep.when == "call" and rep.failed:
         if "driver" in item.fixturenames:
             driver = item.funcargs["driver"]
-            driver.test_failed = True
+            allure.attach(
+                driver.get_screenshot_as_png(),
+                name=f"{item.name}_failure_screenshot",
+                attachment_type=allure.attachment_type.PNG
+            )
