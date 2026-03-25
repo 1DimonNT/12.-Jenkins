@@ -3,13 +3,11 @@ import allure
 import pytest
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 
 
 @pytest.fixture(scope="function")
 def driver(request):
-    """Фикстура для создания и закрытия драйвера через Selenoid"""
+    """Фикстура для создания и закрытия драйвера через Selenoid с видео"""
     chrome_options = Options()
 
     # Проверяем, запущены ли тесты в Jenkins
@@ -23,6 +21,18 @@ def driver(request):
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
 
+        # Настройки Selenoid с видео
+        selenoid_capabilities = {
+            "browserName": "chrome",
+            "browserVersion": "146.0",
+            "selenoid:options": {
+                "enableVNC": True,  # Включает удаленный доступ для отладки
+                "enableVideo": True,  # Включает запись видео
+                "videoName": f"{request.node.name}_{request.node.nodeid}.mp4"
+            }
+        }
+        chrome_options.capabilities.update(selenoid_capabilities)
+
         # Правильный URL Selenoid из вашего окружения
         selenoid_url = "https://ru.selenoid.autotests.cloud/wd/hub"
 
@@ -33,17 +43,21 @@ def driver(request):
     else:
         # Локальный запуск (для разработки)
         chrome_options.add_argument("--start-maximized")
+        from selenium.webdriver.chrome.service import Service
+        from webdriver_manager.chrome import ChromeDriverManager
+
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
     driver.implicitly_wait(10)
 
-    # Сохраняем имя теста
+    # Сохраняем имя теста и сессию
     driver.test_name = request.node.name
+    driver.session_id = driver.session_id
 
     yield driver
 
-    # Добавляем скриншот после теста (всегда)
+    # Добавляем скриншот
     allure.attach(
         driver.get_screenshot_as_png(),
         name=f"{driver.test_name}_screenshot",
@@ -63,6 +77,15 @@ def driver(request):
         name=f"{driver.test_name}_page_title",
         attachment_type=allure.attachment_type.TEXT
     )
+
+    # Добавляем ссылку на видео из Selenoid
+    if is_jenkins:
+        video_url = f"https://ru.selenoid.autotests.cloud/video/{driver.session_id}.mp4"
+        allure.attach(
+            video_url,
+            name=f"{driver.test_name}_video_link",
+            attachment_type=allure.attachment_type.TEXT
+        )
 
     driver.quit()
 
