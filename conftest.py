@@ -1,6 +1,6 @@
 import os
-import allure
 import pytest
+import allure
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
@@ -24,11 +24,11 @@ def driver(request):
         # Настройки Selenoid с видео
         selenoid_capabilities = {
             "browserName": "chrome",
-            "browserVersion": "146.0",
+            "browserVersion": "128.0",  # Используем доступную версию
             "selenoid:options": {
                 "enableVNC": True,  # Включает удаленный доступ для отладки
                 "enableVideo": True,  # Включает запись видео
-                "videoName": f"{request.node.name}_{request.node.nodeid}.mp4"
+                "videoName": f"{request.node.name}.mp4"
             }
         }
         chrome_options.capabilities.update(selenoid_capabilities)
