@@ -1,7 +1,8 @@
 import os
-import pytest
 import allure
+import pytest
 import requests
+from time import sleep
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -178,24 +179,43 @@ def driver(request, selenoid_url, browser_name, browser_version, headless_mode, 
         session_id = driver.session_id
         video_url = f"https://ru.selenoid.autotests.cloud/video/{session_id}.mp4"
 
-        try:
-            response = requests.get(video_url, timeout=10)
-            if response.status_code == 200:
+        # Ждем готовности видео (до 30 секунд)
+        video_ready = False
+        for attempt in range(6):
+            sleep(5)
+            try:
+                response = requests.head(video_url, timeout=5, allow_redirects=True)
+                if response.status_code == 200:
+                    video_ready = True
+                    break
+            except:
+                continue
+
+        if video_ready:
+            try:
+                response = requests.get(video_url, timeout=10)
+                if response.status_code == 200:
+                    allure.attach(
+                        response.content,
+                        name=f"{driver.test_name}_video.mp4",
+                        attachment_type=allure.attachment_type.MP4
+                    )
+                else:
+                    allure.attach(
+                        f"Video error: HTTP {response.status_code}\nURL: {video_url}",
+                        name=f"{driver.test_name}_video_error",
+                        attachment_type=allure.attachment_type.TEXT
+                    )
+            except Exception as e:
                 allure.attach(
-                    response.content,
-                    name=f"{driver.test_name}_video.mp4",
-                    attachment_type=allure.attachment_type.MP4
-                )
-            else:
-                allure.attach(
-                    f"Video not available (HTTP {response.status_code})\nURL: {video_url}",
+                    f"Video download exception: {e}\nURL: {video_url}",
                     name=f"{driver.test_name}_video_error",
                     attachment_type=allure.attachment_type.TEXT
                 )
-        except Exception as e:
+        else:
             allure.attach(
-                f"Video download error: {e}\nURL: {video_url}",
-                name=f"{driver.test_name}_video_error",
+                f"Video not ready after 30 seconds\nSession ID: {session_id}\nURL: {video_url}",
+                name=f"{driver.test_name}_video_not_ready",
                 attachment_type=allure.attachment_type.TEXT
             )
 
